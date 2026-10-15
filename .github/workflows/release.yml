@@ -1,0 +1,30 @@
+# Publishes the cookbook to Chef Supermarket. Run it from the Actions tab, or:
+#   gh workflow run release -R EyalSec/chef-es-python --ref v1.0.0
+# Needs two repository secrets: SUPERMARKET_USER (your Supermarket user name)
+# and SUPERMARKET_KEY (the private key Supermarket gave that user, PEM text).
+name: release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  supermarket:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+      - name: Check the ref is the tag metadata.rb names
+        run: |
+          v="$(sed -n "s/^version *'\(.*\)'/\1/p" metadata.rb)"
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "run this on the tag v$v"; exit 1; }
+      - run: gem install --no-document stove
+      - name: Share on Supermarket
+        env:
+          SUPERMARKET_USER: ${{ secrets.SUPERMARKET_USER }}
+          SUPERMARKET_KEY: ${{ secrets.SUPERMARKET_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$SUPERMARKET_KEY" > "$RUNNER_TEMP/supermarket.pem"
+          stove --no-git --username "$SUPERMARKET_USER" --key "$RUNNER_TEMP/supermarket.pem"
